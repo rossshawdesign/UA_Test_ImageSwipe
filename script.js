@@ -15,11 +15,11 @@ document.body.appendChild(app.view);
 // =====================================
 // IMAGE SOURCES
 // =====================================
-  const imageUrls = [
-    "https://raw.githubusercontent.com/rossshawdesign/UA_Test_ImageSwipe/main/images/sea.jpeg",
-    "https://raw.githubusercontent.com/rossshawdesign/UA_Test_ImageSwipe/main/images/banff.jpg",
-    "https://raw.githubusercontent.com/rossshawdesign/UA_Test_ImageSwipe/main/images/parakeet.jpg"
-  ];
+const imageUrls = [
+  "https://cdn.pixabay.com/photo/2025/11/28/14/40/sea-9983074_1280.jpg",
+  "https://cdn.pixabay.com/photo/2023/10/20/17/52/banff-8329971_1280.jpg",
+  "https://cdn.pixabay.com/photo/2026/01/18/10/16/parakeet-10074499_1280.jpg"
+];
 
 // =====================================
 // CONSTANTS
@@ -31,14 +31,13 @@ const ASPECT_RATIO = 1 / 1.6;
 const MAX_ROTATION = 5 * (Math.PI / 180);
 const MAX_SKEW = 0.05;
 const SNAP_BACK_SPEED = 0.5;
-
 const FLY_OUT_SPEED = 30;
 
 const NEXT_CARD_SCALE = 0.95;
 const SCALE_LERP_SPEED = 0.15;
 
-const STROKE_THRESHOLD = 200; // distance for "fly out"
-const EDGE_COMMIT_RATIO = 0.2; // 20% screen width
+const STROKE_THRESHOLD = 200; // distance to swipe off screen
+const EDGE_COMMIT_RATIO = 0.2;
 
 // =====================================
 // ROOT CONTAINER
@@ -51,15 +50,12 @@ let activeCard = null;
 let textures = [];
 
 // =====================================
-// LOAD IMAGES
+// LOAD TEXTURES (PIXI v7+)
 // =====================================
-const loader = new PIXI.Loader();
-imageUrls.forEach(url => loader.add(url));
+PIXI.Assets.load(imageUrls).then(() => {
+  textures = imageUrls.map(url => PIXI.Assets.get(url));
 
-loader.load(() => {
-  textures = imageUrls.map(url => loader.resources[url].texture);
-
-  // Initial stack (3 cards for illusion)
+  // Initial stack (3 cards for visual depth)
   for (let i = 0; i < 3; i++) {
     const card = createCard(randomTexture());
     carouselContainer.addChild(card.container);
@@ -127,7 +123,7 @@ function setActiveCard() {
 }
 
 // =====================================
-// DRAG LOGIC (USER SWIPE ONLY)
+// DRAG LOGIC (DISTANCE-BASED SWIPE)
 // =====================================
 function enableDrag(card) {
   const container = card.container;
@@ -167,9 +163,8 @@ function enableDrag(card) {
     dragging = false;
     container.cursor = "grab";
 
-    // Check swipe distance
     if (Math.abs(card.targetX) > STROKE_THRESHOLD) {
-      // Fly out
+      // Card flies off in direction of swipe
       card.flyingOut = true;
       card.velocityX = card.targetX > 0 ? FLY_OUT_SPEED : -FLY_OUT_SPEED;
     } else {
@@ -210,7 +205,7 @@ function update() {
 }
 
 // =====================================
-// CARD RESET / RECYCLE (ENDLESS)
+// RECYCLE CARD (ENDLESS STACK)
 // =====================================
 function recycleCard(card) {
   resetCard(card);

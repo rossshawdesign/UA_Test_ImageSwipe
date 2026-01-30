@@ -13,12 +13,12 @@ const app = new PIXI.Application({
 document.body.appendChild(app.view);
 
 // =====================================
-// IMAGE SOURCES (local GitHub images)
+// IMAGE SOURCES (raw GitHub URLs)
 // =====================================
 const imageUrls = [
-  "images/sea.jpg",
-  "images/banff.jpg",
-  "images/parakeet.jpg"
+  "https://raw.githubusercontent.com/rossshawdesign/UA_Test_ImageSwipe/main/images/sea.jpg",
+  "https://raw.githubusercontent.com/rossshawdesign/UA_Test_ImageSwipe/main/images/banff.jpg",
+  "https://raw.githubusercontent.com/rossshawdesign/UA_Test_ImageSwipe/main/images/parakeet.jpg"
 ];
 
 // =====================================
@@ -137,8 +137,8 @@ function enableDrag(card) {
   container.cursor = "grab";
 
   let dragging = false;
-  let pointerDownX = 0;  // pointer start
-  let startDragX = 0;    // card start
+  let pointerDownX = 0;
+  let startDragX = 0;
   let lastTime = 0;
 
   container

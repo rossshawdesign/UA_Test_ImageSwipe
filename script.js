@@ -16,9 +16,9 @@ document.body.appendChild(app.view);
 // IMAGE SOURCES (raw GitHub URLs)
 // =====================================
 const imageUrls = [
-  "https://raw.githubusercontent.com/rossshawdesign/UA_Test_ImageSwipe/main/images/sea.jpg",
-  "https://raw.githubusercontent.com/rossshawdesign/UA_Test_ImageSwipe/main/images/banff.jpg",
-  "https://raw.githubusercontent.com/rossshawdesign/UA_Test_ImageSwipe/main/images/parakeet.jpg"
+  "https://raw.githubusercontent.com/rossshawdesign/UA_Test_ImageSwipe/main/images/sea.jpeg",
+  "https://raw.githubusercontent.com/rossshawdesign/UA_Test_ImageSwipe/main/images/banff.jpeg",
+  "https://raw.githubusercontent.com/rossshawdesign/UA_Test_ImageSwipe/main/images/parakeet.jpeg"
 ];
 
 // =====================================

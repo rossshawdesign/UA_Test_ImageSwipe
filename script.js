@@ -13,12 +13,12 @@ const app = new PIXI.Application({
 document.body.appendChild(app.view);
 
 // =====================================
-// IMAGE SOURCES
+// IMAGE SOURCES (local GitHub images)
 // =====================================
 const imageUrls = [
-  "https://cdn.pixabay.com/photo/2025/11/28/14/40/sea-9983074_1280.jpg",
-  "https://cdn.pixabay.com/photo/2023/10/20/17/52/banff-8329971_1280.jpg",
-  "https://cdn.pixabay.com/photo/2026/01/18/10/16/parakeet-10074499_1280.jpg"
+  "images/sea.jpg",
+  "images/banff.jpg",
+  "images/parakeet.jpg"
 ];
 
 // =====================================
@@ -49,6 +49,7 @@ app.stage.addChild(carouselContainer);
 
 let cards = [];
 let activeCard = null;
+let textures = [];
 
 // =====================================
 // LOAD IMAGES
@@ -57,11 +58,14 @@ const loader = new PIXI.Loader();
 imageUrls.forEach(url => loader.add(url));
 
 loader.load(() => {
-  imageUrls.forEach((url, index) => {
-    const card = createCard(loader.resources[url].texture);
+  textures = imageUrls.map(url => loader.resources[url].texture);
+
+  // Initial stack (3 cards for illusion)
+  for (let i = 0; i < 3; i++) {
+    const card = createCard(randomTexture());
     carouselContainer.addChild(card.container);
     cards.push(card);
-  });
+  }
 
   setupStack();
   app.ticker.add(update);
@@ -69,7 +73,7 @@ loader.load(() => {
 });
 
 // =====================================
-// CARD FACTORY (IMPORTANT FIX)
+// CARD FACTORY
 // =====================================
 function createCard(texture) {
   const container = new PIXI.Container();
@@ -82,9 +86,7 @@ function createCard(texture) {
 
   const stroke = new PIXI.Graphics();
 
-  container.addChild(sprite);
-  container.addChild(mask);
-  container.addChild(stroke);
+  container.addChild(sprite, mask, stroke);
 
   return {
     container,
@@ -96,8 +98,12 @@ function createCard(texture) {
     targetSkew: 0,
     velocityX: 0,
     flyingOut: false,
-    scaleTarget: 1
+    scaleTarget: NEXT_CARD_SCALE
   };
+}
+
+function randomTexture() {
+  return textures[Math.floor(Math.random() * textures.length)];
 }
 
 // =====================================
@@ -107,23 +113,23 @@ function setupStack() {
   cards.forEach((card, i) => {
     card.scaleTarget = i === cards.length - 1 ? 1 : NEXT_CARD_SCALE;
     card.container.scale.set(card.scaleTarget);
+    card.container.zIndex = i;
   });
 
+  carouselContainer.sortChildren();
   setActiveCard();
 }
 
 function setActiveCard() {
-  if (activeCard) activeCard.container.interactive = false;
+  if (!cards.length) return;
 
   activeCard = cards[cards.length - 1];
-  if (!activeCard) return;
-
   activeCard.scaleTarget = 1;
   enableDrag(activeCard);
 }
 
 // =====================================
-// DRAG LOGIC
+// DRAG LOGIC (FIXED SENSITIVITY)
 // =====================================
 function enableDrag(card) {
   const container = card.container;
@@ -131,7 +137,8 @@ function enableDrag(card) {
   container.cursor = "grab";
 
   let dragging = false;
-  let lastX = 0;
+  let pointerDownX = 0;  // pointer start
+  let startDragX = 0;    // card start
   let lastTime = 0;
 
   container
@@ -139,7 +146,9 @@ function enableDrag(card) {
       dragging = true;
       card.flyingOut = false;
       container.cursor = "grabbing";
-      lastX = e.data.global.x;
+
+      pointerDownX = e.data.global.x;
+      startDragX = card.targetX;
       lastTime = performance.now();
     })
     .on("pointermove", (e) => {
@@ -148,11 +157,11 @@ function enableDrag(card) {
       const now = performance.now();
       const currentX = e.data.global.x;
 
-      const dx = currentX - lastX;
+      const dx = currentX - pointerDownX;
       const dt = now - lastTime || 1;
 
       card.velocityX = dx / dt;
-      card.targetX += dx;
+      card.targetX = startDragX + dx;
 
       const progress = Math.max(-1, Math.min(1, card.targetX / 200));
       card.targetRotation = progress * MAX_ROTATION;
@@ -160,7 +169,6 @@ function enableDrag(card) {
 
       updateStroke(card);
 
-      lastX = currentX;
       lastTime = now;
     })
     .on("pointerup", () => release(card))
@@ -170,21 +178,21 @@ function enableDrag(card) {
     dragging = false;
     container.cursor = "grab";
 
-    const absX = Math.abs(card.targetX);
     const edgeLimit = window.innerWidth * EDGE_COMMIT_RATIO;
 
     if (
       Math.abs(card.velocityX) > SWIPE_VELOCITY_THRESHOLD ||
-      absX > edgeLimit
+      Math.abs(card.targetX) > edgeLimit
     ) {
       card.flyingOut = true;
       card.velocityX =
         Math.sign(card.targetX || card.velocityX) * FLY_OUT_SPEED;
+
+      // Immediately make next card active
+      const nextCard = cards[cards.length - 2];
+      if (nextCard) setActiveCard();
     } else {
-      card.targetX = 0;
-      card.targetRotation = 0;
-      card.targetSkew = 0;
-      clearStroke(card);
+      resetCard(card);
     }
   }
 }
@@ -193,43 +201,64 @@ function enableDrag(card) {
 // UPDATE LOOP
 // =====================================
 function update() {
-  cards.forEach((card) => {
-    const { container } = card;
+  cards.forEach(card => {
+    const c = card.container;
 
-    container.scale.x +=
-      (card.scaleTarget - container.scale.x) * SCALE_LERP_SPEED;
-    container.scale.y = container.scale.x;
+    // scale animation
+    c.scale.x += (card.scaleTarget - c.scale.x) * SCALE_LERP_SPEED;
+    c.scale.y = c.scale.x;
 
     if (card === activeCard) {
       if (card.flyingOut) {
-        container.x += card.velocityX;
+        c.x += card.velocityX;
 
-        if (Math.abs(container.x) > window.innerWidth * 1.2) {
-          removeCard(card);
+        if (Math.abs(c.x) > window.innerWidth * 1.2) {
+          recycleCard(card);
         }
       } else {
-        container.x += (card.targetX - container.x) * SNAP_BACK_SPEED;
-        container.rotation +=
-          (card.targetRotation - container.rotation) * SNAP_BACK_SPEED;
-        container.skew.x +=
-          (card.targetSkew - container.skew.x) * SNAP_BACK_SPEED;
+        c.x += (card.targetX - c.x) * SNAP_BACK_SPEED;
+        c.rotation += (card.targetRotation - c.rotation) * SNAP_BACK_SPEED;
+        c.skew.x += (card.targetSkew - c.skew.x) * SNAP_BACK_SPEED;
       }
     }
   });
 }
 
 // =====================================
-// CARD REMOVAL
+// CARD RESET / RECYCLE (ENDLESS)
 // =====================================
-function removeCard(card) {
-  carouselContainer.removeChild(card.container);
+function recycleCard(card) {
+  resetCard(card);
+
+  card.sprite.texture = randomTexture();
+  card.scaleTarget = NEXT_CARD_SCALE;
+
+  // Move recycled card under the stack
+  cards.unshift(card);
   cards.pop();
 
-  if (cards.length > 0) {
-    cards[cards.length - 1].scaleTarget = 1;
-  }
-
+  // Immediately make new top card active
   setActiveCard();
+
+  // Update zIndex and scale for smooth visuals
+  cards.forEach((c, i) => {
+    c.scaleTarget = i === cards.length - 1 ? 1 : NEXT_CARD_SCALE;
+    c.container.zIndex = i;
+  });
+
+  carouselContainer.sortChildren();
+}
+
+function resetCard(card) {
+  card.targetX = 0;
+  card.targetRotation = 0;
+  card.targetSkew = 0;
+  card.velocityX = 0;
+  card.flyingOut = false;
+  card.container.x = 0;
+  card.container.rotation = 0;
+  card.container.skew.set(0, 0);
+  card.stroke.clear();
 }
 
 // =====================================
@@ -246,10 +275,6 @@ function updateStroke(card) {
   }
 }
 
-function clearStroke(card) {
-  card.stroke.clear();
-}
-
 function drawStroke(g, sprite, color) {
   g.lineStyle(6, color, 1);
   g.drawRoundedRect(
@@ -262,7 +287,7 @@ function drawStroke(g, sprite, color) {
 }
 
 // =====================================
-// RESIZE (FIXED & CORRECT)
+// RESIZE
 // =====================================
 function resize() {
   const imageHeight = window.innerHeight * HEIGHT_RATIO;
@@ -272,13 +297,10 @@ function resize() {
   carouselContainer.y = window.innerHeight / 2;
 
   cards.forEach((card, index) => {
-    const { sprite, mask, stroke, container } = card;
+    const { sprite, mask, container } = card;
 
     sprite.width = imageWidth;
     sprite.height = imageHeight;
-
-    sprite.x = 0;
-    sprite.y = 0;
 
     mask.clear();
     mask.beginFill(0xffffff);
@@ -291,13 +313,8 @@ function resize() {
     );
     mask.endFill();
 
-    stroke.clear();
-
     container.x = 0;
     container.y = 0;
-    container.rotation = 0;
-    container.skew.set(0, 0);
-
     container.zIndex = index;
   });
 
